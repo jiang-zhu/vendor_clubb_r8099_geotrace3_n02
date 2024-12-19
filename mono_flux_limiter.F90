@@ -564,11 +564,23 @@ module mono_flux_limiter
        max_x_allowable(k) = maxval( max_x_allowable_lev(low_lev:high_lev) )
 
        ! Find the upper limit for w'x' for a monotonic turbulent flux.
+       !! See https://github.com/NCAR/amwg_dev/discussions/134
+       !! The following "if" statement ensures there are no "spikes" at the top of the column,
+       !! which can cause unphysical rtm and thlm tendencies over the height of the column.
+       !! The fix essentially turns off the monotonic flux limiter for these special cases,
+       !! but tests show that it still performs well otherwise and runs stably.
+       if ( solve_type == mono_flux_rtm  &
+          .and. abs( wpxp(km1) ) > 1 / ( dt * gr%invrs_dzt(k) ) &
+          * ( xm_without_ta(k) - min_x_allowable(k) ) &
+          .and. wpxp(km1) < 0.0_core_rknd ) then
+         wpxp_mfl_max(k) = 0.0_core_rknd
+       else
        wpxp_mfl_max(k)  &
        = invrs_rho_ds_zm(k)  &
                   * (   ( rho_ds_zt(k) / (dt*gr%invrs_dzt(k)) )  &
                         * ( xm_without_ta(k) - min_x_allowable(k) )  &
                       + rho_ds_zm(km1) * wpxp(km1)  )
+       endif
 
        ! Find the lower limit for w'x' for a monotonic turbulent flux.
        wpxp_mfl_min(k)  &
